@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 
+from gensim import corpora
 import unicodecsv as csv
 import cPickle as pickle
 import string
-from gensim import corpora
+import re
+import time
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem.snowball import EnglishStemmer
-import re
-import time
-#from nltk.stem.isri import ISRIStemmer
+from nltk.stem.isri import ISRIStemmer
+
 #import os
 
 """
@@ -24,16 +25,23 @@ Transformations:
 """
 def load_documents(text_dump_path):
     with open(text_dump_path, 'rU') as f:
-        reader = csv.DictReader(f, delimiter=',', dialect='excel') #((line.replace('\0','') for line in f), delimiter=",") #
+        reader = csv.DictReader(f, delimiter=',', dialect='excel')
         for row in reader:
-            yield [row['row'], row['Text']] #unicode(row['Text'], encoding='utf-8', errors = 'ignore')
+            yield [row['row'], row['Text']] 
 
 def tokenize_documents(documents):
-    filtered_words = stopwords.words('english') + stopwords.words('spanish')
-    stemmer = EnglishStemmer()
-    #arabicstemmer = ISRIStemmer()
-    filtered_chars = { ord(char):None for char in
-                       (string.punctuation) }
+
+    stop_words = stopwords.words('english') + stopwords.words('spanish') #common words to be filtered
+    english = EnglishStemmer()
+    arabic = ISRIStemmer()
+
+    def valid_word(token, filtered=stop_words): 
+        # Returns false for common words, links, and strange patterns
+            if (token in filtered) or (token[0:4] == u'http') or\
+            (token in string.punctuation): #(((u'uu' in token) or (u'uau' in token)) and len(token) <= 4):
+                return False
+            else:
+                return True
 
     for doc in documents:
 
@@ -46,30 +54,28 @@ def tokenize_documents(documents):
             doc = doc.strip()
             # remove twitter handles (words in doc starting with @)
             doc = re.sub(r"@\w+|\b@\w+", "", doc)
-            # remove puncuation
-            doc = doc.translate(filtered_chars)
             # lowercase letters
             doc = doc.lower()
 
-            # tokenize
-            if u'<' and u'>' in doc:
-                tokens = nltk.wordpunkt_tokenize(doc)  #for docs with arabic or foreign unicode
-                return doc, tokens
-            else: 
-                tokens = nltk.word_tokenize(doc) #for roman characters
+            # tokenization: handles documents with arabic or foreign characters
+            tokens = nltk.tokenize.wordpunct_tokenize(doc)
 
-            # remove common words, stem the words, correct spellings of gaddafi, delete strange patterns
-            tokens = [
-            u'gaddafi' if token in [u'gadhafi', u'gadafi', u'ghadhafi', u'kadhafi', u'khadafi', u'kaddafi'] 
-            else stemmer.stem(token) 
-            for token in tokens 
-            if token not in filtered_words 
-            and not (((u'uu' in token) or (u'uau' in token)) and len(token) <= 4)
-            and token[0:4] != u'http'
-            ]
+            cleaned_tokens = []
+            for token in tokens:
 
-            #yield row
-            #yield tokens
+                # for valid words, correct spellings of gaddafi and stem words
+                if valid_word(token):
+                
+                    if token in [u'gadhafi', u'gadafi', u'ghadhafi', u'kadhafi', u'khadafi', u'kaddafi']:
+                        token = u'gaddafi'
+                    else:
+                        token = arabic.stem(english.stem(token)) 
+
+                    cleaned_tokens.append(token)    
+
+            yield row
+            yield cleaned_tokens
+                 
 
 
 def make_dtm(tokenized_docs, no_below=50, perc_above=0.95, keep_n=100000):
@@ -91,12 +97,12 @@ def main():
     tokenized_docs = list(tokenize_documents(documents))
     rows = tokenized_docs[::2]
     tokenized_docs = tokenized_docs[1::2]
-    # id2word, dtm = make_dtm(tokenized_docs)
+    id2word, dtm = make_dtm(tokenized_docs)
 
-    # id2word.save('data\\origtweets_dict.pkl')
-    # with open('data\\origtweets_dtm.pkl', 'wb') as pkl_file:
-    #     pickle.dump(dtm, pkl_file)
-    #id2word.save_as_text('data\\sorted_dict.tsv', sort_by_word=False)
+    id2word.save('data\\origtweets_dict.pkl')
+    with open('data\\origtweets_dtm.pkl', 'wb') as pkl_file:
+        pickle.dump(dtm, pkl_file)
+    id2word.save_as_text('data\\sorted_dict.tsv', sort_by_word=False)
 
     f = open('data\\cleaned_origtweets.csv', 'wb')
     w = csv.writer(f, encoding='utf-8')

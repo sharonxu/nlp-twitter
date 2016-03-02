@@ -87,7 +87,7 @@ def main():
 		'dict_file': 'data\\origtweets_dict.pkl',
 		'logfilename': 'data\\numtopics_results.txt',
 		'train_split': 0.9,
-		'iters': 500,
+		'iters': 600,
 		'workers': 8,
 		'chunksize': 1000
 	}
