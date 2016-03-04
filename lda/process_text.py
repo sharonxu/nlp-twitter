@@ -35,10 +35,12 @@ def tokenize_documents(documents):
     english = EnglishStemmer()
     arabic = ISRIStemmer()
 
+    punctuation = { ord(char): None for char in string.punctuation}
+
     def valid_word(token, filtered=stop_words): 
         # Returns false for common words, links, and strange patterns
             if (token in filtered) or (token[0:4] == u'http') or\
-            (token in string.punctuation): #(((u'uu' in token) or (u'uau' in token)) and len(token) <= 4):
+            (token in string.punctuation):
                 return False
             else:
                 return True
@@ -56,6 +58,8 @@ def tokenize_documents(documents):
             doc = re.sub(r"@\w+|\b@\w+", "", doc)
             # lowercase letters
             doc = doc.lower()
+            # remove punctuation
+            doc = doc.translate(punctuation)
 
             # tokenization: handles documents with arabic or foreign characters
             tokens = nltk.tokenize.wordpunct_tokenize(doc)
@@ -106,9 +110,12 @@ def main():
 
     f = open('data\\cleaned_origtweets.csv', 'wb')
     w = csv.writer(f, encoding='utf-8')
+    w.writerow(['row', 'Text'])
+    
     for i in xrange(len(rows)):
         doc = [rows[i], u' '.join(tokenized_docs[i])]
         w.writerow(doc)
+
     end_time = time.time()
     print ('running time: ' + str((end_time - start_time)/60) + ' minutes')
 
