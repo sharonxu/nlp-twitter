@@ -92,7 +92,7 @@ def main():
 		'chunksize': 1000
 	}
 
-	corpus_file = params['corpus_file']
+	corpus = params['corpus_file']
 	num_topics_list = [5, 10, 15, 20]
  
 	id2word = corpora.Dictionary.load(params['dict_file'])
